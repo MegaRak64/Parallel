@@ -1,5 +1,6 @@
 package net.roguelogic.mods.parallel.internal;
 
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.roguelogic.mods.parallel.API.IThreaded;
 
 import java.util.HashSet;
@@ -13,12 +14,24 @@ final class SubThread extends Thread {
 
     private long lastTickTime = -1;
 
+    private boolean done=false;
+
+    public boolean getDone(){
+        return done;
+    }
+
     SubThread(HashSet<IThreaded> set) {
         toExecute = set;
+        this.setName("Parallel Thread");
+    }
+
+    public SubThread begin(){
+        super.start();
+        return this;
     }
 
     void update() {
-        this.notify();
+        this.interrupt();
     }
 
     void kill() {
@@ -40,16 +53,20 @@ final class SubThread extends Thread {
                 tempTime = System.nanoTime();
             }
         }
-        Management.removeThread(this);
+        Management.removeThread(toExecute, this);
     }
 
     private long tempTime = -1;
 
-    private void waitForTick(){
-        Management.done();
-        try {
-            wait();
-        } catch (InterruptedException ignored) {}
+    private void waitForTick() {
+        done=true;
+        while (true)
+            try {
+                sleep(1000);
+            } catch (InterruptedException ignored) {
+                break;
+            }
+        done=false;
     }
 
     public long getLastTickTime() {
