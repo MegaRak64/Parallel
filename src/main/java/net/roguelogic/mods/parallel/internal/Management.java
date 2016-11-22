@@ -2,15 +2,22 @@ package net.roguelogic.mods.parallel.internal;
 
 import net.roguelogic.mods.parallel.API.IThreaded;
 import net.roguelogic.mods.parallel.API.MCThread;
+import net.roguelogic.mods.parallel.internal.swing.ThreadMonitor;
 
+import javax.swing.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
-public final class Management {
+public final class Management{
 
     public static void init(){
         mainThread = Thread.currentThread();
+        monitor = new ThreadMonitor();
+        monitor.setResizable(false);
+        monitor.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        monitor.pack();
+        monitor.setVisible(true);
     }
 
     // Thread Ticking
@@ -27,31 +34,92 @@ public final class Management {
 
     private static boolean mainWaiting = false;
 
-    public static void done(){
-        threadsDone++;
-        if (threadsDone == threadsToExecute.size() + fullThreads.size()) {
-            allThreadsDone = true;
-            if (mainWaiting)
-                mainThread.notify();
-        }
+
+    public static boolean multithreded = false;
+
+    private static int ticks=0;
+
+    public static boolean done(){
+        int threadsDone = 0;
+
+        for (MCThread thread : fullThreads)
+            if (thread.getDone())
+                threadsDone++;
+
+        for (SubThread thread : threadsToExecute)
+            if (thread.getDone())
+                threadsDone++;
+
+        return threadsDone==threadsToExecute.size()+fullThreads.size();
     }
 
-    public static void update(){
-        if (!allThreadsDone){
-            mainWaiting = true;
-            try {
-                Thread.currentThread().wait();
-            } catch (InterruptedException ignored) {}
-        }
+    public static void update() {
         checkThreads();
-        threadsDone=0;
-        allThreadsDone = mainWaiting = false;
-        threadsToExecute.forEach(SubThread::update);
+        if (multithreded) {
+            ticks++;
+            if (!done()) {
+                mainWaiting=true;
+                while (true)
+                    try {
+                        Thread.sleep(1);
+                        if (done())
+                            break;
+                    } catch (InterruptedException ignored) {}
+            }
+            allThreadsDone = false;
+            threadsToExecute.forEach(SubThread::update);
+        } else
+            allToExecute.forEach(IThreaded::update);
+        LTT = System.nanoTime() - TT;
+        TT = System.nanoTime();
+        updateMonitor();
+    }
+
+    // Thread Monitoring
+
+    private static ThreadMonitor monitor;
+
+    private static long TT =0;
+    private static long LTT = 0;
+
+    static void updateMonitor(){
+        switch (threadsToExecute.size()) {
+            case 8:
+                monitor.jProgressBar9.setValue((int) (threadsToExecute.get(7).getLastTickTime() / 1_000_000));
+                monitor.jLabel9.setText(String.valueOf(threadsToExecute.get(7).getLastTickTime() / 1_000_000));
+            case 7:
+                monitor.jProgressBar8.setValue((int) (threadsToExecute.get(6).getLastTickTime() / 1_000_000));
+                monitor.jLabel8.setText(String.valueOf(threadsToExecute.get(6).getLastTickTime() / 1_000_000));
+            case 6:
+                monitor.jProgressBar7.setValue((int) (threadsToExecute.get(5).getLastTickTime() / 1_000_000));
+                monitor.jLabel7.setText(String.valueOf(threadsToExecute.get(5).getLastTickTime() / 1_000_000));
+            case 5:
+                monitor.jProgressBar6.setValue((int) (threadsToExecute.get(4).getLastTickTime() / 1_000_000));
+                monitor.jLabel6.setText(String.valueOf(threadsToExecute.get(4).getLastTickTime() / 1_000_000));
+            case 4:
+                monitor.jProgressBar5.setValue((int) (threadsToExecute.get(3).getLastTickTime() / 1_000_000));
+                monitor.jLabel5.setText(String.valueOf(threadsToExecute.get(3).getLastTickTime() / 1_000_000));
+            case 3:
+                monitor.jProgressBar4.setValue((int) (threadsToExecute.get(2).getLastTickTime() / 1_000_000));
+                monitor.jLabel4.setText(String.valueOf(threadsToExecute.get(2).getLastTickTime() / 1_000_000));
+            case 2:
+                monitor.jProgressBar3.setValue((int) (threadsToExecute.get(1).getLastTickTime() / 1_000_000));
+                monitor.jLabel3.setText(String.valueOf(threadsToExecute.get(1).getLastTickTime() / 1_000_000));
+            case 1:
+                monitor.jProgressBar2.setValue((int) (threadsToExecute.get(0).getLastTickTime() / 1_000_000));
+                monitor.jLabel2.setText(String.valueOf(threadsToExecute.get(0).getLastTickTime() / 1_000_000));
+            default:
+                monitor.jProgressBar1.setValue((int) (LTT/1_000_000));
+                monitor.jLabel1.setText(String.valueOf(LTT/1_000_000));
+                monitor.jLabel12.setText(String.valueOf(allToExecute.size()));
+                monitor.jLabel10.setText(multithreded ? "True" : "False");
+
+        }
     }
 
     // Thread execution management
 
-    private static boolean rebalance = false;
+    private static boolean rebalance = true;
 
     private static HashMap<IThreaded, Long> TimeMap = new HashMap<>();
 
@@ -59,21 +127,22 @@ public final class Management {
 
     private static ArrayList<HashSet<IThreaded>> threadExecuting = new ArrayList<>();
 
-    private static int totalThreads = Runtime.getRuntime().availableProcessors();
+    private static int totalThreads;
 
     private static HashSet<IThreaded> toBeAdded = new HashSet<>();
     private static HashSet<IThreaded> toBeRemoved = new HashSet<>();
 
-    public static void removeThread(Thread subThread) {
-        threadExecuting.remove(subThread);
+    public static void removeThread(HashSet<IThreaded> iThreadedHashSet, SubThread thread) {
+        threadExecuting.remove(iThreadedHashSet);
+        threadsToExecute.remove(thread);
         forceRebalance();
     }
 
-    static void forceRebalance(){
+    private static void forceRebalance(){
         rebalance = true;
     }
 
-    static void checkThreads(){
+    private static void checkThreads(){
         if (rebalance || totalThreads != Runtime.getRuntime().availableProcessors() || checkTimes()>0)
             rebalanceThreads();
         else
@@ -81,7 +150,7 @@ public final class Management {
         fullThreads.stream().filter(thread -> !thread.isAlive()).forEach(thread -> fullThreads.remove(thread));
     }
 
-    static int checkTimes(){
+    private static int checkTimes(){
         int threadsOverTime =0;
         for (SubThread thread : threadsToExecute) {
             if ((thread.getLastTickTime()/1_000_000)>=50)
@@ -90,7 +159,7 @@ public final class Management {
         return threadsOverTime;
     }
 
-    static void rebalanceThreads(){
+    private static void rebalanceThreads(){
 
         rebalance=false;
 
@@ -106,9 +175,8 @@ public final class Management {
 
             totalThreads = Runtime.getRuntime().availableProcessors();
             for (int i = 0; i < totalThreads; i++) {
-                threadExecuting.set(i, new HashSet<>());
-                threadsToExecute.set(i, new SubThread(threadExecuting.get(i)));
-                threadsToExecute.get(i).start();
+                threadExecuting.add(new HashSet<>());
+                threadsToExecute.add(new SubThread(threadExecuting.get(i)).begin());
             }
         }
 
@@ -159,9 +227,14 @@ public final class Management {
         }
     }
 
-    static int iterator = 0;
+    private static int iterator = 0;
 
-    static void addAndRemove(){
+    private static void addAndRemove(){
+        if (toBeAdded.size()+toBeRemoved.size()>=200){
+            rebalanceThreads();
+            return;
+        }
+
         toBeRemoved.forEach(iThreaded -> toBeAdded.remove(iThreaded));
 
         for (IThreaded add : toBeAdded){
