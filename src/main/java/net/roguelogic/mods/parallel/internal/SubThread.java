@@ -3,6 +3,7 @@ package net.roguelogic.mods.parallel.internal;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.roguelogic.mods.parallel.API.IThreaded;
 
+import java.util.ConcurrentModificationException;
 import java.util.HashSet;
 
 final class SubThread extends Thread {
@@ -44,13 +45,16 @@ final class SubThread extends Thread {
         while (!killed) {
             while (!stopped) {
                 waitForTick();
-                for (IThreaded object : toExecute){
-                    iThreadedTempTime = System.nanoTime();
-                    object.update();
-                    Management.setTickTime(object, System.nanoTime() - iThreadedTempTime);
-                }
-                lastTickTime = System.nanoTime()-tempTime;
-                tempTime = System.nanoTime();
+                try {
+                    for (IThreaded object : toExecute) {
+                        iThreadedTempTime = System.nanoTime();
+                        currentIThreaded = object;
+                        object.update();
+                        Management.setTickTime(object, System.nanoTime() - iThreadedTempTime);
+                    }
+                    lastTickTime = System.nanoTime() - tempTime;
+                    tempTime = System.nanoTime();
+                }catch (ConcurrentModificationException ignored){}
             }
         }
         Management.removeThread(toExecute, this);
@@ -69,7 +73,17 @@ final class SubThread extends Thread {
         done=false;
     }
 
-    public long getLastTickTime() {
+    long getLastTickTime() {
         return lastTickTime;
+    }
+
+    IThreaded currentIThreaded = null;
+
+    IThreaded getCurrentIThreaded(){
+        return currentIThreaded;
+    }
+
+    void removeCurrentIThreaded() {
+        toExecute.remove(currentIThreaded);
     }
 }

@@ -26,4 +26,9 @@ final class Updater {
             Management.update();
         }
     }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onWorldUnload(final WorldEvent.Unload unloadWorldEvent) {
+        Management.worldUnload();
+    }
 }

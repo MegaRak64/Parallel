@@ -2,7 +2,7 @@
 {
   "modid": "parallel",
   "name": "Parallel",
-  "description": "Parallel is a multi-threading library making minecraft run better on newer multicore computers.",
+  "description": "Parallel is a multi-threading library allowing minecraft run better on newer multicore computers.",
   "version": "1.10.2-0.0.0",
   "mcversion": "1.10.2",
   "url": "",

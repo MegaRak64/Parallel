@@ -1,6 +1,6 @@
 package net.roguelogic.mods.parallel.API;
 
-public class MCThread extends Thread {
+public class MCThread extends Thread{
 
     private boolean done=false;
 
@@ -9,7 +9,8 @@ public class MCThread extends Thread {
     }
 
     /**
-     * called every tick to have thread wait for next tick cycle and stay in sync
+     * call every tick to have thread sync with main
+     * required to be called as main thread will wait until it is.
      */
     protected void waitForTick(){
         done = true;
@@ -17,5 +18,9 @@ public class MCThread extends Thread {
             wait();
         } catch (InterruptedException ignored) {}
         done=true;
+    }
+
+    public void update() {
+        this.interrupt();
     }
 }

@@ -1,5 +1,6 @@
 package net.roguelogic.mods.parallel.internal;
 
+import net.minecraftforge.fml.common.FMLLog;
 import net.roguelogic.mods.parallel.API.IThreaded;
 import net.roguelogic.mods.parallel.API.MCThread;
 import net.roguelogic.mods.parallel.internal.swing.ThreadMonitor;
@@ -8,16 +9,17 @@ import javax.swing.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.stream.Collectors;
 
 public final class Management{
 
     public static void init(){
         mainThread = Thread.currentThread();
-        monitor = new ThreadMonitor();
-        monitor.setResizable(false);
-        monitor.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        monitor.pack();
-        monitor.setVisible(true);
+//        monitor = new ThreadMonitor();
+//        monitor.setResizable(false);
+//        monitor.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+//        monitor.pack();
+//        monitor.setVisible(true);
     }
 
     // Thread Ticking
@@ -35,7 +37,7 @@ public final class Management{
     private static boolean mainWaiting = false;
 
 
-    public static boolean multithreded = false;
+    public static boolean multithreded = true;
 
     private static int ticks=0;
 
@@ -54,25 +56,54 @@ public final class Management{
     }
 
     public static void update() {
-        checkThreads();
+        ticks=0;
         if (multithreded) {
-            ticks++;
             if (!done()) {
                 mainWaiting=true;
-                while (true)
+                while (true) {
                     try {
-                        Thread.sleep(1);
-                        if (done())
+                        if (ticks>=500) {
+                            tickToLong();
+                        }
+                        if (done()) {
                             break;
+                        }
+                        Thread.sleep(1);
                     } catch (InterruptedException ignored) {}
+                }
             }
             allThreadsDone = false;
             threadsToExecute.forEach(SubThread::update);
         } else
             allToExecute.forEach(IThreaded::update);
+        fullThreads.forEach(MCThread::update);
+        checkThreads();
         LTT = System.nanoTime() - TT;
         TT = System.nanoTime();
-        updateMonitor();
+//        updateMonitor();
+    }
+
+    static void tickToLong(){
+        int threadsDone=0;
+
+        for (SubThread thread : threadsToExecute)
+            if (thread.getDone())
+                threadsDone++;
+
+        if (threadsDone == threadsToExecute.size()){
+            // remove stuck thread and log error
+            fullThreads.stream().filter(thread -> !thread.getDone()).forEach(thread ->{
+                unregister(thread);
+                FMLLog.severe("Thread '" + thread.getName() + "' took to long to tick, removed from sync registry");
+            });
+        }else{
+            // IThreaded stuck, this should not happen but just in case ill remove it, and restart a new thread next tick.
+            HashSet<SubThread> stuckThreads = threadsToExecute.stream().filter(thread -> !thread.getDone()).collect(Collectors.toCollection(HashSet::new));
+            for (SubThread thread : stuckThreads) {
+                allToExecute.remove(thread.getCurrentIThreaded());
+                thread.removeCurrentIThreaded();
+            }
+        }
     }
 
     // Thread Monitoring
@@ -121,7 +152,7 @@ public final class Management{
 
     private static boolean rebalance = true;
 
-    private static HashMap<IThreaded, Long> TimeMap = new HashMap<>();
+    private static HashMap<IThreaded, Long> timeMap = new HashMap<>();
 
     private static HashSet<IThreaded> allToExecute = new HashSet<>();
 
@@ -159,17 +190,18 @@ public final class Management{
         return threadsOverTime;
     }
 
-    private static void rebalanceThreads(){
+    private static void rebalanceThreads() {
 
-        rebalance=false;
 
-        if (totalThreads == Runtime.getRuntime().availableProcessors() && totalThreads == checkTimes())
+        if (!rebalance && totalThreads == Runtime.getRuntime().availableProcessors() && totalThreads == checkTimes())
             // CPU is maxed, get a better computer.
             return;
 
+        rebalance = false;
+
         // Somebody changed the number of cores i can use......
         threadExecuting.clear();
-        if (totalThreads != Runtime.getRuntime().availableProcessors()){
+        if (totalThreads != Runtime.getRuntime().availableProcessors() || threadExecuting.size() == 0) {
             threadsToExecute.forEach(SubThread::kill);
             threadsToExecute.clear();
 
@@ -180,86 +212,92 @@ public final class Management{
             }
         }
 
-        ArrayList<IThreaded> sorted = new ArrayList<>();
-        IThreaded currentLongest = null;
-        long currentLongestTime = 0;
+        ArrayList<HashSet<IThreaded>> threads = new ArrayList<>();
+        threads.addAll(threadExecuting);
+        for (int i = totalThreads - 1; i >= 0; i--)
+            threads.add(threadExecuting.get(i));
 
-        for (int i = 0; i < allToExecute.size(); i++) {
-            for (IThreaded iThreaded : allToExecute) {
-                if (TimeMap.get(iThreaded) > currentLongestTime) {
-                    currentLongest = iThreaded;
-                    currentLongestTime = TimeMap.get(iThreaded);
+        while (true)
+            try {
+                if (done()) {
+                    break;
                 }
-            }
-            sorted.add(currentLongest);
-            TimeMap.put(currentLongest, -1L);
-        }
-
-        boolean incresing = true;
-
-        boolean secondEndPass = false;
-
-        int currentThreadNum = 0;
-
-        for (IThreaded iThreaded : sorted){
-            threadExecuting.get(currentThreadNum).add(iThreaded);
-
-            if (currentThreadNum==totalThreads){
-                if (!secondEndPass)
-                    secondEndPass = true;
-                else{
-                    secondEndPass=false;
-                    incresing=false;
-                }
-            }else if (currentThreadNum==0){
-                if (!secondEndPass)
-                    secondEndPass = true;
-                else{
-                    secondEndPass=false;
-                    incresing=true;
-                }
+                Thread.sleep(1);
+            } catch (InterruptedException ignored) {
             }
 
-            if (incresing && !secondEndPass)
-                currentThreadNum++;
-            else
-                currentThreadNum--;
+        int i = 0;
+        for (IThreaded iThreaded : allToExecute) {
+            threads.get(i).add(iThreaded);
+            if (++i >= threads.size())
+                i = 0;
         }
     }
 
     private static int iterator = 0;
 
     private static void addAndRemove(){
-        if (toBeAdded.size()+toBeRemoved.size()>=200){
-            rebalanceThreads();
-            return;
-        }
-
-        toBeRemoved.forEach(iThreaded -> toBeAdded.remove(iThreaded));
+        toBeRemoved.forEach(iThreaded -> {
+            toBeAdded.remove(iThreaded);
+            allToExecute.remove(iThreaded);
+        });
 
         for (IThreaded add : toBeAdded){
-            threadExecuting.get(iterator).add(add);
-            if (iterator++ >= totalThreads)
+            if (++iterator >= totalThreads)
                 iterator = 0;
+            threadExecuting.get(iterator).add(add);
+            allToExecute.add(add);
         }
+
+        for (IThreaded add : toBeRemoved){
+            for (HashSet set : threadExecuting)
+                set.remove(toBeRemoved);
+            allToExecute.remove(add);
+        }
+
+        clearAddedAndRemoved=true;
 
     }
 
     static void setTickTime(IThreaded iThreaded, long time){
-        TimeMap.put(iThreaded, time);
+        timeMap.put(iThreaded, time);
     }
 
+    private static boolean clearAddedAndRemoved = false;
+
     public static void register(IThreaded toRegister){
+        if (clearAddedAndRemoved){
+            toBeAdded.clear();
+            toBeRemoved.clear();
+        }
         if (allToExecute.contains(toRegister))
             return;
-        allToExecute.add(toRegister);
         toBeAdded.add(toRegister);
     }
 
     public static void unregister(IThreaded toUnregister){
+        if (clearAddedAndRemoved){
+            toBeAdded.clear();
+            toBeRemoved.clear();
+        }
         if (!allToExecute.contains(toUnregister))
             return;
-        allToExecute.remove(toUnregister);
         toBeRemoved.add(toUnregister);
+    }
+
+    public static void register(MCThread toRegister) {
+        fullThreads.add(toRegister);
+    }
+
+    public static void unregister(MCThread toUnregister) {
+        fullThreads.remove(toUnregister);
+    }
+
+    public static void worldUnload() {
+        threadExecuting.forEach(HashSet::clear);
+        allToExecute.clear();
+        toBeAdded.clear();
+        toBeRemoved.clear();
+        timeMap.clear();
     }
 }
