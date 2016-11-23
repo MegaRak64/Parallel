@@ -1,4 +1,4 @@
-package net.roguelogic.mods.parallel.API;
+package net.roguelogic.mods.parallel.api;
 
 public class MCThread extends Thread{
 

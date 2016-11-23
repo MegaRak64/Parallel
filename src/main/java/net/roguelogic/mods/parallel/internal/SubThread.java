@@ -1,7 +1,6 @@
 package net.roguelogic.mods.parallel.internal;
 
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.roguelogic.mods.parallel.API.IThreaded;
+import net.roguelogic.mods.parallel.api.IThreaded;
 
 import java.util.ConcurrentModificationException;
 import java.util.HashSet;

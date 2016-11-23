@@ -1,11 +1,10 @@
 package net.roguelogic.mods.parallel.internal;
 
 import net.minecraftforge.fml.common.FMLLog;
-import net.roguelogic.mods.parallel.API.IThreaded;
-import net.roguelogic.mods.parallel.API.MCThread;
+import net.roguelogic.mods.parallel.api.IThreaded;
+import net.roguelogic.mods.parallel.api.MCThread;
 import net.roguelogic.mods.parallel.internal.swing.ThreadMonitor;
 
-import javax.swing.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

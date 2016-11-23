@@ -1,4 +1,4 @@
-package net.roguelogic.mods.parallel.API;
+package net.roguelogic.mods.parallel.api;
 
 import net.roguelogic.mods.parallel.internal.Management;
 
