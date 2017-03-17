@@ -6,26 +6,23 @@ import java.util.ConcurrentModificationException;
 import java.util.HashSet;
 
 final class SubThread extends Thread {
+    private IThreaded currentIThreaded = null;
     private HashSet<IThreaded> toExecute;
-
     private boolean killed = false;
-
-    private boolean stopped = false;
-
     private long lastTickTime = -1;
-
-    private boolean done=false;
-
-    public boolean getDone(){
-        return done;
-    }
+    private boolean done = false;
+    private long tempTime = -1;
 
     SubThread(HashSet<IThreaded> set) {
         toExecute = set;
         this.setName("Parallel Thread");
     }
 
-    public SubThread begin(){
+    boolean getDone() {
+        return done;
+    }
+
+    SubThread begin() {
         super.start();
         return this;
     }
@@ -42,7 +39,7 @@ final class SubThread extends Thread {
     public void run() {
         long iThreadedTempTime;
         while (!killed) {
-            while (!stopped) {
+            while (true) {
                 waitForTick();
                 try {
                     for (IThreaded object : toExecute) {
@@ -53,32 +50,29 @@ final class SubThread extends Thread {
                     }
                     lastTickTime = System.nanoTime() - tempTime;
                     tempTime = System.nanoTime();
-                }catch (ConcurrentModificationException ignored){}
+                } catch (ConcurrentModificationException ignored) {
+                }
             }
         }
         Management.removeThread(toExecute, this);
     }
 
-    private long tempTime = -1;
-
     private void waitForTick() {
-        done=true;
+        done = true;
         while (true)
             try {
                 sleep(1000);
             } catch (InterruptedException ignored) {
                 break;
             }
-        done=false;
+        done = false;
     }
 
     long getLastTickTime() {
         return lastTickTime;
     }
 
-    IThreaded currentIThreaded = null;
-
-    IThreaded getCurrentIThreaded(){
+    IThreaded getCurrentIThreaded() {
         return currentIThreaded;
     }
 

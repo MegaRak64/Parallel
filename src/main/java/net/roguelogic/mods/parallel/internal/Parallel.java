@@ -7,7 +7,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 public final class Parallel {
 
     @Mod.EventHandler
-    public void onPreInit(FMLPreInitializationEvent event){
+    public void onPreInit(FMLPreInitializationEvent event) {
         // To quote a well known mod.
         // The start of something Great
         new Updater();
