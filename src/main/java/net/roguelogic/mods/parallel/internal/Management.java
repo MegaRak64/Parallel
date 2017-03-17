@@ -3,7 +3,6 @@ package net.roguelogic.mods.parallel.internal;
 import net.minecraftforge.fml.common.FMLLog;
 import net.roguelogic.mods.parallel.api.IThreaded;
 import net.roguelogic.mods.parallel.api.MCThread;
-import net.roguelogic.mods.parallel.internal.swing.ThreadMonitor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +26,6 @@ public final class Management {
 
     private static boolean mainWaiting = false;
     private static int ticks = 0;
-    private static ThreadMonitor monitor;
     private static long TT = 0;
     private static long LTT = 0;
     private static boolean rebalance = true;
@@ -46,11 +44,6 @@ public final class Management {
 
     static void init() {
         mainThread = Thread.currentThread();
-//        monitor = new ThreadMonitor();
-//        monitor.setResizable(false);
-//        monitor.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-//        monitor.pack();
-//        monitor.setVisible(true);
     }
 
     private static boolean done() {
@@ -93,7 +86,6 @@ public final class Management {
         checkThreads();
         LTT = System.nanoTime() - TT;
         TT = System.nanoTime();
-//        updateMonitor();
     }
 
     private static void tickToLong() {
@@ -116,41 +108,6 @@ public final class Management {
                 allToExecute.remove(thread.getCurrentIThreaded());
                 thread.removeCurrentIThreaded();
             }
-        }
-    }
-
-    static void updateMonitor() {
-        switch (threadsToExecute.size()) {
-            case 8:
-                monitor.jProgressBar9.setValue((int) (threadsToExecute.get(7).getLastTickTime() / 1_000_000));
-                monitor.jLabel9.setText(String.valueOf(threadsToExecute.get(7).getLastTickTime() / 1_000_000));
-            case 7:
-                monitor.jProgressBar8.setValue((int) (threadsToExecute.get(6).getLastTickTime() / 1_000_000));
-                monitor.jLabel8.setText(String.valueOf(threadsToExecute.get(6).getLastTickTime() / 1_000_000));
-            case 6:
-                monitor.jProgressBar7.setValue((int) (threadsToExecute.get(5).getLastTickTime() / 1_000_000));
-                monitor.jLabel7.setText(String.valueOf(threadsToExecute.get(5).getLastTickTime() / 1_000_000));
-            case 5:
-                monitor.jProgressBar6.setValue((int) (threadsToExecute.get(4).getLastTickTime() / 1_000_000));
-                monitor.jLabel6.setText(String.valueOf(threadsToExecute.get(4).getLastTickTime() / 1_000_000));
-            case 4:
-                monitor.jProgressBar5.setValue((int) (threadsToExecute.get(3).getLastTickTime() / 1_000_000));
-                monitor.jLabel5.setText(String.valueOf(threadsToExecute.get(3).getLastTickTime() / 1_000_000));
-            case 3:
-                monitor.jProgressBar4.setValue((int) (threadsToExecute.get(2).getLastTickTime() / 1_000_000));
-                monitor.jLabel4.setText(String.valueOf(threadsToExecute.get(2).getLastTickTime() / 1_000_000));
-            case 2:
-                monitor.jProgressBar3.setValue((int) (threadsToExecute.get(1).getLastTickTime() / 1_000_000));
-                monitor.jLabel3.setText(String.valueOf(threadsToExecute.get(1).getLastTickTime() / 1_000_000));
-            case 1:
-                monitor.jProgressBar2.setValue((int) (threadsToExecute.get(0).getLastTickTime() / 1_000_000));
-                monitor.jLabel2.setText(String.valueOf(threadsToExecute.get(0).getLastTickTime() / 1_000_000));
-            default:
-                monitor.jProgressBar1.setValue((int) (LTT / 1_000_000));
-                monitor.jLabel1.setText(String.valueOf(LTT / 1_000_000));
-                monitor.jLabel12.setText(String.valueOf(allToExecute.size()));
-                monitor.jLabel10.setText(multithreded ? "True" : "False");
-
         }
     }
 
