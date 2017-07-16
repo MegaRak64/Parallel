@@ -1,10 +1,10 @@
 package net.roguelogic.mods.parallel.api;
 
-public class MCThread extends Thread{
+public class MCThread extends Thread {
 
-    private boolean done=false;
+    private boolean done = false;
 
-    public boolean getDone(){
+    public boolean getDone() {
         return done;
     }
 
@@ -12,12 +12,13 @@ public class MCThread extends Thread{
      * call every tick to have thread sync with main
      * required to be called as main thread will wait until it is.
      */
-    protected void waitForTick(){
+    protected void waitForTick() {
         done = true;
         try {
             wait();
-        } catch (InterruptedException ignored) {}
-        done=true;
+        } catch (InterruptedException ignored) {
+        }
+        done = true;
     }
 
     public void update() {
